@@ -1,1 +1,293 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Квест: Маніпуляції зі статистикою</title>
+  <meta name="description" content="Інтерактивне завдання для виявлення маніпуляцій зі статистикою: середнє проти медіани, вибіркова подача даних, оманливі графіки.">
+  <style>
+    :root{
+      /* SmartWeek */
+      --green:#009846;        /* primary */
+      --yellow:#FFED00;       /* accent */
+      --red:#AE2220;          /* alert */
+      --navy:#152731;         /* header bg */
+      /* UI */
+      --bg:#f7f8f9;
+      --card:#fff;
+      --text:#1f2937;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --ok:#0e9f6e;
+      --focus:#0ea5e9;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{
+      color:#fff;background:var(--navy);
+      padding:1.25rem 1rem 1.4rem;border-bottom:4px solid var(--yellow); text-align:center
+    }
+    header h1{margin:.2rem 0;font-size:clamp(1.2rem,3.5vw,1.9rem)}
+    header .badge{display:inline-block;margin-left:.4rem;padding:.18rem .55rem;border-radius:999px;background:var(--yellow);color:#111;font-weight:700;border:2px solid rgba(0,0,0,.08)}
+    header p{margin:.25rem 0 0;color:#e5e7eb}
+    main{max-width:960px;margin:1.2rem auto;padding:0 1rem}
+    .panel{background:linear-gradient(180deg,#ffffff,#fbfbfb);border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;margin:.9rem 0}
+    .grid{display:grid;gap:.75rem}
+    .q-title{margin:0 0 .6rem;font-weight:800}
+    .options{display:grid;gap:.5rem}
+    .opt{display:flex;gap:.6rem;align-items:flex-start;border:1px solid var(--border);border-radius:10px;padding:.6rem .7rem;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .02s}
+    .opt:active{transform:scale(.998)}
+    .opt input{accent-color:var(--green);margin-top:.2rem}
+    .opt.correct{border-color:#b5ebc9;background:#f3fbf6;box-shadow:0 0 0 2px rgba(0,152,70,.12) inset}
+    .opt.wrong{border-color:#f3c4c3;background:#fff6f6;box-shadow:0 0 0 2px rgba(174,34,32,.10) inset}
+    .explain{margin:.55rem 0 0;color:var(--muted);display:none}
+    .explain.show{display:block}
+    .controls{display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;justify-content:center;}
+    button{appearance:none;border:0;border-radius:12px;padding:.85rem 1.05rem;font-weight:700;cursor:pointer}
+    .btn-primary{background:var(--green);color:#fff}
+    .result{font-weight:900}
+    a:focus,button:focus,input:focus{outline:2px solid var(--focus);outline-offset:2px;border-radius:8px}
+    footer{padding:2rem 1rem;text-align:center;color:var(--muted)}
+    .hide{display:none}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Квест: Маніпуляції зі статистикою <span class="badge">SmartWeek</span></h1>
+    <p>Обери відповідь, щоб отримати пояснення та перейти до наступного питання.</p>
+  </header>
+
+  <main>
+    <div class="panel card">
+      <div id="question-container">
+        <!-- Питання будуть вставлятися сюди -->
+      </div>
+      <div id="result-container" class="hide">
+        <!-- Результат буде тут -->
+      </div>
+      <div class="controls" style="margin-top:1rem">
+        <button type="button" id="next-btn" class="btn-primary hide">Наступне питання</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary><strong>Шпаргалка:</strong> на які статистичні хитрощі звертати увагу?</summary>
+        <ul>
+          <li><strong>Середнє чи медіана:</strong> Чи є в даних аномальні викиди? Якщо так, середнє значення може вводити в оману. Медіана часто є більш показовою.</li>
+          <li><strong>Маніпуляція з графіками:</strong> Чи починається вісь Y з нуля? Зміна масштабу може візуально перебільшити або применшити різницю.</li>
+          <li><strong>"Чері-пікінг":</strong> Чи не показують вам лише зручні дані, ігноруючи решту? Завжди питайте про повну картину.</li>
+          <li><strong>Кореляція ≠ Причинність:</strong> Те, що дві речі відбуваються одночасно, не означає, що одна є причиною іншої. Шукайте приховані фактори.</li>
+          <li><strong>Розмір вибірки:</strong> Чи достатньо велика вибірка, щоб робити узагальнення? Висновки на основі двох-трьох людей не є надійними.</li>
+        </ul>
+      </details>
+    </div>
+  </main>
+
+  <footer>
+    © <span id="y"></span> learn4life-ua · Освітній проєкт «Розпізнай маніпуляцію»
+  </footer>
+
+  <script>
+    const quizData = [
+      {
+        q: "Агрокомпанія звітує про врожайність на 7 полях (т/га): `[1.5, 2, 2, 2.5, 3, 3.5, 9]`. У рекламі вони стверджують: «Наша середня врожайність — 3.36 т/га!». В чому полягає маніпуляція?",
+        options: [
+          "Розрахунки абсолютно правильні, тому ніякої маніпуляції немає.",
+          "Середнє арифметичне (3.36) є завищеним через одне аномальне значення (9.0). Медіана (2.5) значно краще показує типову ситуацію.",
+          "Компанія мала використовувати моду (2.0), оскільки це значення зустрічається найчастіше."
+        ],
+        a: 1,
+        why: "Це класична маніпуляція статистикою. Використання середнього значення, коли є сильні викиди, створює викривлене, надто оптимістичне уявлення. Медіана є більш стійкою до таких викидів і краще відображає центральну тенденцію."
+      },
+      {
+        q: "На графіку показано зростання ефективності нового гербіциду. Стовпчик \"Минулого року\" має висоту 1 см, а \"Цього року\" - 2 см. Підписи на осі Y починаються з 98%. Ефективність зросла з 98.5% до 99%. Як графік вводить в оману?",
+        options: [
+          "Графік візуально перебільшує незначне зростання, починаючи вісь Y не з нуля, а з 98%.",
+          "Стовпчикові діаграми не підходять для показу ефективності.",
+          "Кольори стовпчиків підібрані неправильно."
+        ],
+        a: 0,
+        why: "Маніпуляція з віссю Y (коли вона починається не з 0) — це поширений спосіб візуально перебільшити незначні відмінності, створюючи хибне враження значного зростання."
+      },
+      {
+        q: "Виробник добрив заявляє: \"Наші добрива підвищили врожайність на 30%!\". Вони отримали цей результат на одному з 10 тестових полів, а на інших 9 полях зростання було 1-2% або нульовим. Яку маніпуляцію використано?",
+        options: [
+          "Помилка вимірювання.",
+          "Вибіркова подача даних (\"чері-пікінг\"), коли показують лише найзручніші результати, ігноруючи решту.",
+          "Використання недостатньо великої вибірки."
+        ],
+        a: 1,
+        why: "\"Чері-пікінг\" — це коли свідомо обирають лише ті дані, що підтверджують бажану тезу, та ігнорують ті, що її спростовують. Це створює неповну та оманливу картину."
+      },
+      {
+        q: "Дослідження показало, що на полях, де фермери використовують дорогі трактори, врожайність вища. Реклама стверджує: \"Купуйте наші дорогі трактори, щоб підвищити врожайність!\". Чому цей висновок може бути хибним?",
+        options: [
+          "Власники дорогих тракторів, імовірно, мають більше грошей і на якісніші добрива та насіння. Трактор — це кореляція, а не причина.",
+          "Колір трактора також може впливати на врожайність.",
+          "Висновки правильні, бо дорога техніка завжди працює краще."
+        ],
+        a: 0,
+        why: "Це класична помилка \"кореляція не дорівнює причинності\". Дві події можуть відбуватися одночасно, але це не означає, що одна є причиною іншої. Часто існує третій, прихований фактор (в даному випадку — загальне багатство фермерського господарства)."
+      },
+      {
+        q: "\"Два з трьох опитаних нами агрономів рекомендують наш новий сорт пшениці!\" - йдеться в рекламі. Чому цей аргумент слабкий?",
+        options: [
+          "Опитування агрономів — це ненадійний метод.",
+          "Вибірка з трьох людей є надто малою, щоб робити будь-які узагальнюючі висновки.",
+          "Можливо, третій агроном просто не розбирається в пшениці."
+        ],
+        a: 1,
+        why: "Результати, отримані на дуже малій вибірці, не є статистично значущими. Їх легко можна пояснити випадковістю, і вони не можуть бути поширені на всю групу (всіх агрономів)."
+      }
+    ];
+
+    const questionContainer = document.getElementById('question-container');
+    const resultContainer = document.getElementById('result-container');
+    const nextButton = document.getElementById('next-btn');
+
+    let shuffledQuestions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+
+    function shuffle(array) {
+      let currentIndex = array.length, randomIndex;
+      while (currentIndex > 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [
+          array[randomIndex], array[currentIndex]];
+      }
+      return array;
+    }
+
+    function startQuiz() {
+      shuffledQuestions = shuffle([...quizData]);
+      currentQuestionIndex = 0;
+      score = 0;
+      resultContainer.classList.add('hide');
+      questionContainer.classList.remove('hide');
+      nextButton.innerHTML = "Наступне питання";
+      nextButton.classList.add('hide');
+      showQuestion();
+    }
+
+    function showQuestion() {
+      questionContainer.innerHTML = '';
+      const currentQuestion = shuffledQuestions[currentQuestionIndex];
+      
+      const questionTitle = document.createElement('h3');
+      questionTitle.className = 'q-title';
+      questionTitle.textContent = `${currentQuestionIndex + 1}) ${currentQuestion.q}`;
+      questionContainer.appendChild(questionTitle);
+      
+      const optionsContainer = document.createElement('div');
+      optionsContainer.className = 'options';
+      
+      const optionsToShuffle = currentQuestion.options.map((optionText, index) => ({
+        text: optionText,
+        isCorrect: index === currentQuestion.a
+      }));
+      
+      const shuffledOptions = shuffle(optionsToShuffle);
+      const correctIndexInShuffled = shuffledOptions.findIndex(opt => opt.isCorrect);
+
+      shuffledOptions.forEach((option, index) => {
+        const label = document.createElement('label');
+        label.className = 'opt';
+        
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = `q${currentQuestionIndex}`;
+        input.value = index;
+        
+        const span = document.createElement('span');
+        span.textContent = option.text;
+        
+        label.appendChild(input);
+        label.appendChild(span);
+        
+        label.addEventListener('click', () => {
+          if (optionsContainer.querySelector('input:disabled')) return;
+          selectAnswer(index, correctIndexInShuffled, optionsContainer);
+        });
+        optionsContainer.appendChild(label);
+      });
+      
+      questionContainer.appendChild(optionsContainer);
+      
+      const explanation = document.createElement('p');
+      explanation.className = 'explain';
+      explanation.textContent = "Пояснення: " + currentQuestion.why;
+      questionContainer.appendChild(explanation);
+    }
+    
+    function selectAnswer(selectedIndex, correctIndex, optionsContainer) {
+      const allLabels = optionsContainer.querySelectorAll('.opt');
+      
+      allLabels.forEach(label => {
+        label.querySelector('input').disabled = true;
+        label.style.cursor = 'default';
+      });
+      
+      const selectedLabel = allLabels[selectedIndex];
+      const correctLabel = allLabels[correctIndex];
+
+      if (selectedIndex === correctIndex) {
+        score++;
+        selectedLabel.classList.add('correct');
+      } else {
+        selectedLabel.classList.add('wrong');
+        correctLabel.classList.add('correct');
+      }
+      
+      questionContainer.querySelector('.explain').classList.add('show');
+      
+      if (currentQuestionIndex < shuffledQuestions.length - 1) {
+        nextButton.classList.remove('hide');
+      } else {
+        nextButton.innerHTML = "Показати результат";
+        nextButton.classList.remove('hide');
+      }
+    }
+
+    function showResults() {
+      questionContainer.classList.add('hide');
+      resultContainer.classList.remove('hide');
+      
+      const total = shuffledQuestions.length;
+      const verdict =
+        score === total ? "Відмінно! Ви бачите цифри наскрізь." :
+        score >= total - 2 ? "Дуже добре! Ви помічаєте більшість хитрощів." :
+        "Є над чим попрацювати. Критичне мислення — ваш найкращий інструмент.";
+          
+      resultContainer.innerHTML = `
+        <h3 class="q-title">Квест завершено!</h3>
+        <p class="result" style="margin-bottom: 1rem;">Ваш результат: ${score} з ${total}</p>
+        <p>${verdict}</p>
+      `;
+
+      nextButton.innerHTML = "Спробувати ще раз";
+    }
+
+    nextButton.addEventListener('click', () => {
+      if (nextButton.innerHTML === "Спробувати ще раз") {
+        startQuiz();
+      } else if (nextButton.innerHTML === "Показати результат") {
+        showResults();
+      } else {
+        currentQuestionIndex++;
+        showQuestion();
+        nextButton.classList.add('hide');
+      }
+    });
+
+    document.getElementById('y').textContent = new Date().getFullYear();
+    
+    startQuiz();
+  </script>
+</body>
+</html>
 
